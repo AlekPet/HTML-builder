@@ -1,47 +1,65 @@
 const fs = require('fs');
 const path = require('path');
+const sourceDir = path.join(__dirname, 'files');
 const newFolder = path.join(__dirname, 'files-copy');
-const folderFiles = path.join(__dirname, 'files');
 
-function makeDir(dir) {
-  fs.mkdir(
-    dir,
-    {
-      recursive: true,
-    },
-    (err) => {
-      if (err) {
-        return console.log(err);
-      }
-    },
-  );
+async function readDir(dir) {
+  const files = await fs.promises.readdir(dir, {
+    withFileTypes: true,
+  });
+
+  return files;
 }
 
-fs.promises
-  .access(newFolder)
-  .then(async () => {
-    await fs.promises.rm(newFolder, { recursive: true });
-    makeDir(newFolder);
-  })
-  .catch(() => makeDir(newFolder))
-  .then(() => {
-    fs.readdir(
-      folderFiles,
+async function copyDirs(dir) {
+  const files = await readDir(dir);
+
+  files.forEach(async (file) => {
+    const source = path.join(dir, file.name);
+    const relativePath = path.relative(sourceDir, source);
+    const dest = path.join(newFolder, relativePath);
+
+    if (file.isDirectory()) {
+      await fs.promises.mkdir(dest, {
+        recursive: true,
+      });
+      copyDirs(source);
+    } else {
+      fs.copyFile(source, dest, (err) => {
+        if (err) console.log(err);
+      });
+    }
+  });
+}
+
+fs.access(newFolder, fs.constants.F_OK, (err) => {
+  if (err) {
+    fs.mkdir(
+      newFolder,
       {
-        withFileTypes: true,
+        recursive: true,
       },
-      (err, files) => {
-        if (err) throw err;
-
-        files.forEach((file) => {
-          if (file.isDirectory()) return;
-          const source = path.resolve(folderFiles, file.name);
-          const dest = path.join(newFolder, file.name);
-
-          fs.copyFile(source, dest, (err) => {
-            if (err) console.log(err);
-          });
-        });
+      (err) => {
+        if (err) return console.log(err);
+        copyDirs(sourceDir);
       },
     );
-  });
+  } else {
+    fs.rm(newFolder, { recursive: true }, (err) => {
+      if (err) {
+        console.log(err);
+      }
+
+      fs.mkdir(
+        newFolder,
+        {
+          recursive: true,
+        },
+        (err) => {
+          if (err) return console.log(err);
+          copyDirs(sourceDir);
+        },
+      );
+    });
+  }
+});
