@@ -23,7 +23,9 @@ fs.readdir(
           return;
         }
 
-        console.log(`${filename} - ${ext} - ${stats.size}`);
+        console.log(
+          `${filename} - ${ext} - ${(stats.size / 1024).toFixed(2)} Кб`,
+        );
       });
     });
   },
